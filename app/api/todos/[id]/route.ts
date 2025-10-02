@@ -7,6 +7,7 @@ interface Todo {
   id: number;
   title: string;
   completed: number;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -17,17 +18,36 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { completed } = body;
 
-    if (typeof completed !== 'boolean') {
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (body.hasOwnProperty('completed')) {
+      if (typeof body.completed !== 'boolean') {
+        return NextResponse.json(
+          { error: 'Completed must be a boolean' },
+          { status: 400 }
+        );
+      }
+      updates.push('completed = ?');
+      values.push(body.completed ? 1 : 0);
+    }
+
+    if (body.hasOwnProperty('due_date')) {
+      updates.push('due_date = ?');
+      values.push(body.due_date || null);
+    }
+
+    if (updates.length === 0) {
       return NextResponse.json(
-        { error: 'Completed must be a boolean' },
+        { error: 'No valid fields to update' },
         { status: 400 }
       );
     }
 
-    const stmt = db.prepare('UPDATE todos SET completed = ? WHERE id = ?');
-    const result = stmt.run(completed ? 1 : 0, id);
+    values.push(id);
+    const stmt = db.prepare(`UPDATE todos SET ${updates.join(', ')} WHERE id = ?`);
+    const result = stmt.run(...values);
 
     if (result.changes === 0) {
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 });

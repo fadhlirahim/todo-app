@@ -10,12 +10,14 @@ interface Todo {
   id: number;
   title: string;
   completed: number;
+  due_date: string | null;
   created_at: string;
 }
 
 export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodo, setNewTodo] = useState('');
+  const [newDueDate, setNewDueDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -67,7 +69,10 @@ export default function TodoList() {
       const response = await fetch('/api/todos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: trimmedTodo }),
+        body: JSON.stringify({
+          title: trimmedTodo,
+          due_date: newDueDate || null
+        }),
       });
 
       if (!response.ok) {
@@ -78,6 +83,7 @@ export default function TodoList() {
       const newTodoItem = await response.json();
       setTodos([newTodoItem, ...todos]);
       setNewTodo('');
+      setNewDueDate('');
     } catch (error) {
       console.error('Failed to add todo:', error);
       setError(error instanceof Error ? error.message : 'Failed to add todo');
@@ -137,6 +143,13 @@ export default function TodoList() {
     }
   };
 
+  const isOverdue = (dueDate: string | null) => {
+    if (!dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(dueDate) < today;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -158,7 +171,7 @@ export default function TodoList() {
             </div>
           )}
 
-          <form onSubmit={addTodo} className="flex gap-2 mb-6">
+          <form onSubmit={addTodo} className="space-y-3 mb-6">
             <Input
               ref={inputRef}
               type="text"
@@ -166,12 +179,21 @@ export default function TodoList() {
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               disabled={submitting}
-              className="flex-1"
               autoFocus
             />
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add'}
-            </Button>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                disabled={submitting}
+                className="flex-1"
+                placeholder="Due date (optional)"
+              />
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
           </form>
 
           <div className="space-y-2">
@@ -189,13 +211,25 @@ export default function TodoList() {
                     checked={Boolean(todo.completed)}
                     onCheckedChange={() => toggleTodo(todo.id, todo.completed)}
                   />
-                  <span
-                    className={`flex-1 ${
-                      todo.completed ? 'line-through text-muted-foreground' : ''
-                    }`}
-                  >
-                    {todo.title}
-                  </span>
+                  <div className="flex-1">
+                    <span
+                      className={`${
+                        todo.completed ? 'line-through text-muted-foreground' : ''
+                      }`}
+                    >
+                      {todo.title}
+                    </span>
+                    {todo.due_date && (
+                      <div className={`text-xs mt-1 ${
+                        isOverdue(todo.due_date) && !todo.completed
+                          ? 'text-red-500 font-semibold'
+                          : 'text-muted-foreground'
+                      }`}>
+                        Due: {new Date(todo.due_date).toLocaleDateString()}
+                        {isOverdue(todo.due_date) && !todo.completed && ' (Overdue!)'}
+                      </div>
+                    )}
+                  </div>
                   <Button
                     variant="destructive"
                     size="sm"

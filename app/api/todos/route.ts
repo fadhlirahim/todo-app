@@ -7,6 +7,7 @@ interface Todo {
   id: number;
   title: string;
   completed: number;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -26,7 +27,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title } = body;
+    const { title, due_date } = body;
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json(
@@ -35,8 +36,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const stmt = db.prepare('INSERT INTO todos (title, completed) VALUES (?, 0)');
-    const result = stmt.run(title.trim());
+    const stmt = db.prepare('INSERT INTO todos (title, completed, due_date) VALUES (?, 0, ?)');
+    const result = stmt.run(title.trim(), due_date || null);
 
     const todo = db.prepare('SELECT * FROM todos WHERE id = ?').get(result.lastInsertRowid) as Todo;
 
