@@ -11,6 +11,7 @@ interface Todo {
   title: string;
   completed: number;
   due_date: string | null;
+  completed_by: string | null;
   created_at: string;
 }
 
@@ -21,7 +22,23 @@ export default function TodoList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [userName, setUserName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load username from localStorage
+  useEffect(() => {
+    const savedName = localStorage.getItem('todoUserName');
+    if (savedName) {
+      setUserName(savedName);
+    }
+  }, []);
+
+  // Save username to localStorage when it changes
+  useEffect(() => {
+    if (userName) {
+      localStorage.setItem('todoUserName', userName);
+    }
+  }, [userName]);
 
   const fetchTodos = useCallback(async () => {
     try {
@@ -94,17 +111,22 @@ export default function TodoList() {
 
   const toggleTodo = async (id: number, completed: number) => {
     const previousTodos = [...todos];
+    const isCompleting = !completed;
+    const completedBy = isCompleting ? (userName.trim() || null) : null;
 
     // Optimistic update
     setTodos(todos.map(todo =>
-      todo.id === id ? { ...todo, completed: completed ? 0 : 1 } : todo
+      todo.id === id ? { ...todo, completed: completed ? 0 : 1, completed_by: completedBy } : todo
     ));
 
     try {
       const response = await fetch(`/api/todos/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: !completed }),
+        body: JSON.stringify({
+          completed: isCompleting,
+          completed_by: completedBy
+        }),
       });
 
       if (!response.ok) {
@@ -171,6 +193,20 @@ export default function TodoList() {
             </div>
           )}
 
+          <div className="mb-4 p-3 bg-accent rounded-md">
+            <label htmlFor="userName" className="text-sm font-medium mb-1 block">
+              Your Name (for tracking completed todos)
+            </label>
+            <Input
+              id="userName"
+              type="text"
+              placeholder="Enter your name..."
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="bg-background"
+            />
+          </div>
+
           <form onSubmit={addTodo} className="space-y-3 mb-6">
             <Input
               ref={inputRef}
@@ -227,6 +263,11 @@ export default function TodoList() {
                       }`}>
                         Due: {new Date(todo.due_date).toLocaleDateString()}
                         {isOverdue(todo.due_date) && !todo.completed && ' (Overdue!)'}
+                      </div>
+                    )}
+                    {todo.completed && todo.completed_by && (
+                      <div className="text-xs mt-1 text-muted-foreground italic">
+                        Completed by: {todo.completed_by}
                       </div>
                     )}
                   </div>

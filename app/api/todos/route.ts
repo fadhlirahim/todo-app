@@ -8,6 +8,7 @@ interface Todo {
   title: string;
   completed: number;
   due_date: string | null;
+  completed_by: string | null;
   created_at: string;
 }
 

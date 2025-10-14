@@ -8,6 +8,7 @@ interface Todo {
   title: string;
   completed: number;
   due_date: string | null;
+  completed_by: string | null;
   created_at: string;
 }
 
@@ -36,6 +37,11 @@ export async function PATCH(
     if (body.hasOwnProperty('due_date')) {
       updates.push('due_date = ?');
       values.push(body.due_date || null);
+    }
+
+    if (body.hasOwnProperty('completed_by')) {
+      updates.push('completed_by = ?');
+      values.push(body.completed_by || null);
     }
 
     if (updates.length === 0) {

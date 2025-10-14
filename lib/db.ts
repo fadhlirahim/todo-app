@@ -25,10 +25,16 @@ function getDatabase() {
     // Check if we need to migrate existing table
     const columns = db.prepare("PRAGMA table_info(todos)").all() as Array<{ name: string }>;
     const hasDueDate = columns.some(col => col.name === 'due_date');
+    const hasCompletedBy = columns.some(col => col.name === 'completed_by');
 
     if (!hasDueDate) {
       // Migrate existing table
       db.exec(`ALTER TABLE todos ADD COLUMN due_date TEXT;`);
+    }
+
+    if (!hasCompletedBy) {
+      // Add completed_by column
+      db.exec(`ALTER TABLE todos ADD COLUMN completed_by TEXT;`);
     }
   }
   return db;
