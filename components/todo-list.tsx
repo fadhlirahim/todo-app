@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import TiptapEditor from '@/components/tiptap-editor';
+import { Pencil } from 'lucide-react';
 
 interface Todo {
   id: number;
@@ -23,6 +25,8 @@ export default function TodoList() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [userName, setUserName] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Load username from localStorage
@@ -165,6 +169,52 @@ export default function TodoList() {
     }
   };
 
+  const startEditing = (todo: Todo) => {
+    setEditingId(todo.id);
+    setEditingContent(todo.title);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingContent('');
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+
+    const previousTodos = [...todos];
+
+    // Optimistic update
+    setTodos(todos.map(todo =>
+      todo.id === editingId ? { ...todo, title: editingContent } : todo
+    ));
+
+    try {
+      const response = await fetch(`/api/todos/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editingContent
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update todo');
+      }
+
+      const updatedTodo = await response.json();
+      setTodos(todos.map(todo =>
+        todo.id === editingId ? updatedTodo : todo
+      ));
+      setEditingId(null);
+      setEditingContent('');
+    } catch (error) {
+      console.error('Failed to update todo:', error);
+      setTodos(previousTodos); // Revert on error
+      setError('Failed to update todo');
+    }
+  };
+
   const isOverdue = (dueDate: string | null) => {
     if (!dueDate) return false;
     const today = new Date();
@@ -241,43 +291,60 @@ export default function TodoList() {
               todos.map((todo) => (
                 <div
                   key={todo.id}
-                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent transition-colors"
+                  className="p-3 border rounded-lg hover:bg-accent transition-colors"
                 >
-                  <Checkbox
-                    checked={Boolean(todo.completed)}
-                    onCheckedChange={() => toggleTodo(todo.id, todo.completed)}
-                  />
-                  <div className="flex-1">
-                    <span
-                      className={`${
-                        todo.completed ? 'line-through text-muted-foreground' : ''
-                      }`}
-                    >
-                      {todo.title}
-                    </span>
-                    {todo.due_date && (
-                      <div className={`text-xs mt-1 ${
-                        isOverdue(todo.due_date) && !todo.completed
-                          ? 'text-red-500 font-semibold'
-                          : 'text-muted-foreground'
-                      }`}>
-                        Due: {new Date(todo.due_date).toLocaleDateString()}
-                        {isOverdue(todo.due_date) && !todo.completed && ' (Overdue!)'}
+                  {editingId === todo.id ? (
+                    <TiptapEditor
+                      content={editingContent}
+                      onUpdate={setEditingContent}
+                      onSave={saveEdit}
+                      onCancel={cancelEditing}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={Boolean(todo.completed)}
+                        onCheckedChange={() => toggleTodo(todo.id, todo.completed)}
+                      />
+                      <div className="flex-1">
+                        <div
+                          className={`prose prose-sm max-w-none ${
+                            todo.completed ? 'line-through text-muted-foreground' : ''
+                          }`}
+                          dangerouslySetInnerHTML={{ __html: todo.title }}
+                        />
+                        {todo.due_date && (
+                          <div className={`text-xs mt-1 ${
+                            isOverdue(todo.due_date) && !todo.completed
+                              ? 'text-red-500 font-semibold'
+                              : 'text-muted-foreground'
+                          }`}>
+                            Due: {new Date(todo.due_date).toLocaleDateString()}
+                            {isOverdue(todo.due_date) && !todo.completed && ' (Overdue!)'}
+                          </div>
+                        )}
+                        {todo.completed && todo.completed_by && (
+                          <div className="text-xs mt-1 text-muted-foreground italic">
+                            Completed by: {todo.completed_by}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {todo.completed && todo.completed_by && (
-                      <div className="text-xs mt-1 text-muted-foreground italic">
-                        Completed by: {todo.completed_by}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteTodo(todo.id)}
-                  >
-                    Delete
-                  </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startEditing(todo)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteTodo(todo.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
